@@ -1,0 +1,26 @@
+{
+    "compilerOptions": {
+        "target": "es2015",
+        "module": "esnext",
+        "baseUrl": "./",
+        "paths": {
+            "@/*": ["./resources/js/*"]
+        }
+    },
+    "include": ["./resources/js/**/*.vue", "./resources/js/**/*.js"],
+    "exclude": [
+        "app",
+        "bootstrap",
+        "config",
+        "database",
+        "deploy",
+        "node_modules",
+        "resources/views",
+        "resources/markdown",
+        "resources/lang",
+        "vendor",
+        "routes",
+        "storage",
+        "tests"
+    ]
+}

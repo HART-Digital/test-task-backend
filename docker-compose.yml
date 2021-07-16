@@ -1,0 +1,57 @@
+version: "3.1"
+services:
+
+  server:
+    image: nginx:alpine
+    working_dir: /application
+    volumes:
+      - ./:/var/www
+      - ./deploy/nginx/conf.d:/etc/nginx/conf.d
+    ports:
+      - "127.0.0.1:8050:80"
+    networks:
+      - backend
+
+  app:
+    build: .
+    working_dir: /var/www
+    environment:
+      - TERM=xterm-256color
+    volumes:
+      - ./:/var/www
+      - ./deploy/php/local.ini:/etc/php/7.3/fpm/conf.d/99-overrides.ini
+    networks:
+      - backend
+
+  db:
+    image: postgres:10.1
+    environment:
+      - POSTGRES_USER=${DB_DATABASE}
+      - POSTGRES_PASSWORD=${DB_USERNAME}
+      - POSTGRES_DB=${DB_PASSWORD}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5451:5432"
+    networks:
+      - backend
+
+  cache:
+    image: redis:6.0.8
+    volumes:
+      - cache-data:/data
+    ports:
+      - 127.0.0.1:6352:6379
+    networks:
+      - backend
+
+
+volumes:
+  db-data:
+    driver: local
+  cache-data:
+    driver: local
+
+networks:
+  backend:
+    driver: bridge

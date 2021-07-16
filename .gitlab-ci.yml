@@ -1,0 +1,175 @@
+# You can override the included template(s) by including variable overrides
+# See https://docs.gitlab.com/ee/user/application_security/sast/#customizing-the-sast-settings
+# Note that environment variables can be set in several places
+# See https://docs.gitlab.com/ee/ci/variables/#priority-of-environment-variables
+variables:
+  PRODUCTION_BASEDIR: "/var/www/backend.estate.myhart.ru"
+  PRODUCTION_BUILD_DIR: "/var/www/backend.estate.myhart.ru-build"
+  PRODUCTION_STORAGE: "/mnt/r1/hart_estate/app_storage_production"
+  FURNITURE: "/mnt/r1/jenkins/home/workspace/HARTEstate_Furniture_CI/Furniture"
+  STAGE_BASEDIR: "/var/www/backend-stage.estate.myhart.ru"
+  STAGE_BUILD_DIR: "/var/www/backend-stage.estate.myhart.ru-build"
+  STAGE_STORAGE: "/mnt/r1/hart_estate/app_storage_stage"
+  PHP_STAGE: php7.4
+  
+stages:
+  - build_production
+  - run_tests_production
+  - update_production
+  - restart_queue_production
+  - build_stage
+  - run_tests_stage
+  - update_stage
+  - restart_queue_stage
+  - scan
+
+build_production:
+  tags:
+    - shell
+  stage: build_production
+  script:
+    - docker pull php:7.4-alpine
+    - docker build -t estate/php:7.4-alpine -f "deploy/dockerfiles/php74" "deploy/dockerfiles"
+    - rm -rf ${PRODUCTION_BUILD_DIR}
+    - mkdir -p ${PRODUCTION_BUILD_DIR}
+    - cp -rf . ${PRODUCTION_BUILD_DIR}/
+    - cd ${PRODUCTION_BUILD_DIR}
+    - cp -f .env.production .env
+    - "${PHP_STAGE} /usr/bin/composer check-platform-reqs"
+    - "${PHP_STAGE} /usr/bin/composer install --no-interaction --optimize-autoloader --quiet"
+    - npm install --silent
+    - npm run production --silent
+  only:
+    variables:
+      - $CI_COMMIT_REF_NAME == "master"
+
+run_tests_production:
+  tags:
+    - shell
+  stage: run_tests_production
+  script:
+    - cd ${PRODUCTION_BUILD_DIR}
+    - chown -R 1000:1000 ${PRODUCTION_BUILD_DIR}
+    - docker-compose run --rm app vendor/bin/phpunit --log-junit ./phpunit-report.xml
+    - mv ./phpunit-report.xml ${CI_PROJECT_DIR}/phpunit-report.xml
+  artifacts:
+    reports:
+      junit: phpunit-report.xml
+  only:
+    variables:
+      - $CI_COMMIT_REF_NAME == "master"
+
+update_production:
+  tags:
+    - shell
+  stage: update_production
+  script:
+    - rm -rf ${PRODUCTION_BASEDIR}
+    - mv ${PRODUCTION_BUILD_DIR} ${PRODUCTION_BASEDIR}
+    - cd ${PRODUCTION_BASEDIR}
+    - rm -rf storage/app
+    - ln -sf ${PRODUCTION_STORAGE} ${PRODUCTION_BASEDIR}/storage/app
+    - chown -R nobody:nobody ${PRODUCTION_BASEDIR}
+    - "${PHP_STAGE} artisan clear-compiled"
+    - "${PHP_STAGE} artisan cache:clear"
+    - "${PHP_STAGE} artisan route:clear"
+    - "${PHP_STAGE} artisan config:clear"
+    - "${PHP_STAGE} artisan view:clear"
+    - "${PHP_STAGE} artisan migrate --force"
+    - "${PHP_STAGE} artisan db:seed --class=RoleSeeder --force"
+    - "${PHP_STAGE} artisan storage:link"
+  only:
+    variables:
+      - $CI_COMMIT_REF_NAME == "master"
+
+restart_queue_production:
+  tags:
+    - shell
+  stage: restart_queue_production
+  script:
+    - docker stop hartestate-php-queue || true
+    - docker rm hartestate-php-queue || true
+    - docker run -d --name hartestate-php-queue -u nobody:nobody -v ${PRODUCTION_BASEDIR}:${PRODUCTION_BASEDIR} -v ${PRODUCTION_STORAGE}:${PRODUCTION_STORAGE} -w ${PRODUCTION_BASEDIR} --net=host --restart=unless-stopped estate/php:7.4-alpine php artisan queue:work --tries 3
+    - docker system prune -f
+  only:
+    variables:
+      - $CI_COMMIT_REF_NAME == "master"
+
+build_stage:
+  tags:
+    - shell
+  stage: build_stage
+  script:
+    - docker pull php:7.4-alpine
+    - docker build -t estate/php:7.4-alpine -f "deploy/dockerfiles/php74" "deploy/dockerfiles"
+    - rm -rf ${STAGE_BUILD_DIR}
+    - mkdir -p ${STAGE_BUILD_DIR}
+    - cp -rf . ${STAGE_BUILD_DIR}/
+    - cd ${STAGE_BUILD_DIR}
+    - cp -f .env.stage .env
+    - "${PHP_STAGE} /usr/bin/composer check-platform-reqs"
+    - "${PHP_STAGE} /usr/bin/composer install --no-interaction --optimize-autoloader --quiet"
+    - npm install --silent
+    - npm run production --silent
+  only:
+    variables:
+      - $CI_COMMIT_REF_NAME == "stage"
+
+run_tests_stage:
+  tags:
+    - shell
+  stage: run_tests_stage
+  script:
+    - cd ${STAGE_BUILD_DIR}
+    - chown -R 1000:1000 ${STAGE_BUILD_DIR}
+    - docker-compose run --rm app vendor/bin/phpunit --log-junit ./phpunit-report.xml
+    - mv ./phpunit-report.xml ${CI_PROJECT_DIR}/phpunit-report.xml
+  artifacts:
+    reports:
+      junit: phpunit-report.xml
+  only:
+    variables:
+      - $CI_COMMIT_REF_NAME == "stage"
+
+update_stage:
+  tags:
+    - shell
+  stage: update_stage
+  script:
+    - rm -rf ${STAGE_BASEDIR}
+    - mv ${STAGE_BUILD_DIR} ${STAGE_BASEDIR}
+    - cd ${STAGE_BASEDIR}
+    - rm -rf storage/app
+    - ln -sf ${STAGE_STORAGE} ${STAGE_BASEDIR}/storage/app
+    - chown -R nobody:nobody ${STAGE_BASEDIR}
+    - "${PHP_STAGE} artisan clear-compiled"
+    - "${PHP_STAGE} artisan cache:clear"
+    - "${PHP_STAGE} artisan route:clear"
+    - "${PHP_STAGE} artisan config:clear"
+    - "${PHP_STAGE} artisan view:clear"
+    - "${PHP_STAGE} artisan migrate"
+    - "${PHP_STAGE} artisan db:seed --class=RoleSeeder"
+    - "${PHP_STAGE} artisan storage:link"
+  only:
+    variables:
+      - $CI_COMMIT_REF_NAME == "stage"
+
+restart_queue_stage:
+  tags:
+    - shell
+  stage: restart_queue_stage
+  script:
+    - docker stop hartestate-php-queue-stage || true
+    - docker rm hartestate-php-queue-stage || true
+    - docker run -d --name hartestate-php-queue-stage -u nobody:nobody -v ${STAGE_BASEDIR}:${STAGE_BASEDIR} -v ${STAGE_STORAGE}:${STAGE_STORAGE} -w ${STAGE_BASEDIR} --net=host --restart=unless-stopped estate/php:7.4-alpine php artisan queue:work --tries 3
+    - docker system prune -f
+  only:
+    variables:
+      - $CI_COMMIT_REF_NAME == "stage"
+
+sast:
+  stage: scan
+  tags:
+    - docker
+include:
+  - template: Security/SAST.gitlab-ci.yml

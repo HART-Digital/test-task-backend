@@ -1,0 +1,23 @@
+# grumphp.yml
+
+grumphp:
+  hooks_dir: ~
+  hooks_preset: local
+  tasks:
+    phpcs:
+      standard: PSR12
+      ignore_patterns:
+        - ./tests/*
+        - ./resources/*
+        - ./database/*
+        - ./bootstrap/*
+        - ./index.php
+        - ./config/l5-swagger.php
+    phpunit:
+      always_execute: true
+  parallel:
+    enabled: true
+    max_workers: 32
+  fixer:
+    enabled: true
+    fix_by_default: true
