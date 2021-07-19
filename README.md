@@ -34,3 +34,7 @@
 3. Установить зависимости PHP: `docker-compose exec app composer install`
 4. Запустить миграцию БД: `docker-compose exec app php artisan migrate --seed`
 
+#### Для сдачи задания
+1. Создать Pull Request в этот репозиторий с твоими изменениями
+2. Оповестить человека, который скинул тебе это тестовое, что ты выполнил задание
+
