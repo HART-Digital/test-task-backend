@@ -16,7 +16,7 @@ class TestController extends Controller
 
     public function upload(StorePlanRequest $request, StorePlanService $service)
     {
-        $service->store($request);
+        $service->validation($request);
 
         return redirect('/test');
     }

@@ -10,10 +10,14 @@
             <div class="bg-white overflow-hidden shadow-xl sm:rounded-lg">
                 <div class="p-6 sm:px-20 bg-white border-b border-gray-200">
                 </div>
-
                 <div class="bg-gray-200 bg-opacity-25 p-2">
                     <div>
                         <form method="post" action="{{ route('upload') }}" enctype="multipart/form-data">
+                          @if (session('msg'))
+                            <div class="text-sm text-red-500">
+                              {{ session('msg') }}
+                            </div>
+                          @endif
                             @csrf
                             <label class="block text-sm font-medium text-gray-700">
                                 Загрузка архива
