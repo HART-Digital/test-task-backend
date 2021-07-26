@@ -26,6 +26,8 @@ class PlansAPIController extends APIController
 
     public function downloadAlbum(string $id): BinaryFileResponse
     {
+
+        dd(112);
         if (!Uuid::isValid($id)) {
             abort(404);
         }
@@ -95,6 +97,7 @@ class PlansAPIController extends APIController
 
     public function index(): JsonResponse
     {
+        dd(1);
         $data = $this->plansService->getList();
         return response()->json($data);
     }
